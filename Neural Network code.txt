@@ -1,0 +1,114 @@
+#Cross validation
+
+from tensorflow.keras.models import Model
+import numpy as np 
+import matplotlib.pyplot as plt
+import glob
+import cv2
+from sklearn.metrics import confusion_matrix 
+from keras.models import Model, Sequential
+from keras.layers import Dense, Flatten, Conv2D, MaxPooling2D
+#from keras.layers.normalization import BatchNormalization
+import os
+import seaborn as sns
+from keras.applications.vgg16 import VGG16
+import tensorflow as tf
+import tensorflow.keras as keras
+import segmentation_models as sm
+from sklearn.model_selection import train_test_split
+from sklearn import svm
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_validate
+from sklearn.model_selection import KFold
+from tensorflow.keras import regularizers
+
+import segmentation_models as sm
+
+sm.set_framework('tf.keras')
+
+sm.framework()
+
+BACKBONE = 'resnet101'
+# preprocess_input = sm.get_preprocessing(BACKBONE)
+#Reisze the image 
+SIZE_X = 256
+SIZE_Y = 256
+
+train_images = []
+
+for directory_path in glob.glob("/content/drive/MyDrive/amanda5.0 data/negative control pH 5/Train_Image"):
+    for img_path in glob.glob(os.path.join(directory_path, "*.jpg")):
+        # print image path
+        img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        img = cv2.resize(img, (SIZE_Y, SIZE_X))
+        train_images.append(img)
+
+train_images = np.array(train_images)
+
+#train Masks
+
+train_masks =[]
+
+for directroy_path in glob.glob("/content/drive/MyDrive/amanda5.0 data/negative control pH 5/Train_Mask"):
+    for mask_path in glob.glob(os.path.join(directroy_path, "*.jpg")):
+        # print image path
+        mask = cv2.imread(mask_path, 0)
+        #rESIZE THE IMAGRE
+        mask = cv2.resize(mask, (SIZE_Y, SIZE_X))
+        train_masks.append(mask)
+    
+train_masks = np.array(train_masks)
+
+# label dataset
+x = train_images
+y= train_masks
+y = np.expand_dims(y, axis = 3) 
+   
+#corss validate the data
+ 
+kf = KFold(n_splits=5, shuffle=True, random_state =42)
+oos_y =[]
+oos_pred = []
+fold = 0
+for train, test in kf.split(x,y):
+    fold +=1
+    print(f"Fold#{fold}")
+    
+    x_train = x[train]
+    y_train = y[train]
+    x_test = x[test]
+    y_test = y[test]
+    
+
+
+
+
+#Split the data
+#x_train,x_test, y_train,y_test = train_test_split(X,Y,
+                                                #  test_size = 0.1, 
+                                               #   random_state=42)
+
+    x_train, x_test = x_train / 255.0, x_test / 255.0
+    y_train, y_test = y_train / 255.0, y_test / 255.0
+###################################################################
+    model = sm.Unet(BACKBONE, encoder_weights = 'imagenet')
+# model = VGG16( weights="imagenet", classifier_activation="softmax")
+
+    model.compile(optimizer = 'adam', loss = 'binary_crossentropy', 
+              metrics = ['accuracy'])
+#model.summary()
+    model.evaluate(x_test, y_test)
+    history = model.fit(x_train, y_train, epochs = 100, verbose = 1,
+                   validation_data=(x_test,y_test)), 
+    kernel_regularizer = tf.keras.regularizers.l1_l2(l1=0.0001, l2=0.0001) #(x_test, y_test)
+   
+    pred = model.predict(x_test)
+    oos_y.append(y_test)
+    oos_y.append(pred)
+    
+    #Machine learning model SVM
+#     clf = svm.SVC(kernel="linear", C=1000)
+#     clf.fit(x_train,y_train)
+#     accuracy_score(y_test,pred)
+    
+    
